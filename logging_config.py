@@ -2,24 +2,38 @@ import sys
 import json
 from loguru import logger
 
-
 # 1. Define the formatter
 def custom_formatter(record):
     # Pretty handling only for LLM logs
     if record["extra"].get("type") == "llm":
         msg = record["message"]
 
-        # LangChain AIMessage/SystemMessage/etc -> use .content
-        if hasattr(msg, "content"):
+        # --- NEW LOGIC START ---
+        
+        # 1. Try to convert Pydantic/LangChain objects to a dict
+        # Pydantic V2 uses model_dump(), V1 uses dict()
+        if hasattr(msg, "model_dump"):
+            msg = msg.model_dump()
+        elif hasattr(msg, "dict"):
+            msg = msg.dict()
+
+        # 2. If it is (or has become) a dict/list, JSON dump it
+        if isinstance(msg, (dict, list)):
+            try:
+                # default=str handles non-serializable objects (like UUIDs or custom classes)
+                msg = json.dumps(msg, indent=2, ensure_ascii=False, default=str)
+            except TypeError:
+                msg = str(msg) # Fallback if JSON fails
+        
+        # 3. If it wasn't a dict/model but has content (e.g. simple string wrapper)
+        elif hasattr(msg, "content"):
             msg = msg.content
-
-        # dict / list -> pretty JSON
-        elif isinstance(msg, (dict, list)):
-            msg = json.dumps(msg, indent=2, ensure_ascii=False)
-
-        # Fallback to string
+            
+        # 4. Fallback
         else:
             msg = str(msg)
+
+        # --- NEW LOGIC END ---
 
         # Override the message in the record so {message} uses the pretty version
         record["message"] = msg
@@ -27,9 +41,9 @@ def custom_formatter(record):
         return (
             "<green>{time:HH:mm:ss}</green> | "
             "<level>{level: <8}</level> | "
-            "<bold><magenta>🤖 AI GENERATION:</magenta></bold>\n"  # Header
-            "<cyan>{message}</cyan>\n"                             # Content on new line
-            "<magenta>--------------------------------------------------</magenta>\n"  # Separator
+            "<bold><magenta>🤖 AI GENERATION:</magenta></bold>\n"
+            "<cyan>{message}</cyan>\n"
+            "<magenta>--------------------------------------------------</magenta>\n"
         )
 
     # Default logging format
@@ -39,8 +53,7 @@ def custom_formatter(record):
         "<level>{message}</level>\n"
     )
 
-
-# 2. Configure the global logger (Runs once when this module is imported)
+# 2. Remove default handler and add custom one
 logger.remove()
 logger.add(sys.stderr, format=custom_formatter, colorize=True)
 

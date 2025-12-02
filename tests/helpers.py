@@ -1,0 +1,66 @@
+import uuid
+from typing import Tuple
+import pathlib
+import sys
+from langchain_core.messages import HumanMessage
+from langgraph.types import Command
+from langgraph.checkpoint.memory import InMemorySaver
+
+GREEN = "\033[92m"
+RESET = "\033[0m"
+
+root = pathlib.Path(__file__).resolve().parents[1]  # go up 1 directory
+sys.path.append(str(root))
+
+from agents.graph import workflow # graph instance
+inmemory = InMemorySaver()
+graph = workflow.compile(checkpointer=inmemory)
+
+async def run_graph_turn(message: str, thread_id: str | None = None) -> Tuple[str, str]:
+    """
+    Run a single turn of the graph, respecting interrupts.
+    Returns (assistant_message, thread_id).
+    """
+
+    tid = thread_id or str(uuid.uuid4())
+    config = {"configurable": {"thread_id": tid}}
+    user_message = HumanMessage(content=message)
+
+    # 1) Get current state for this thread
+    snapshot = await graph.aget_state(config)
+    print("🧪 next:", snapshot.next)
+    if snapshot.tasks:
+        print("🧪 task node:", snapshot.tasks[0].node)
+        print("🧪 interrupts:", snapshot.tasks[0].interrupts)
+
+    # 2) Decide whether to resume an interrupt, or run normally
+    if snapshot.tasks and snapshot.tasks[0].interrupts:
+        # we're resuming an interrupted task
+        result = await graph.ainvoke(
+            Command(resume=message),
+            config=config,
+        )
+    else:
+        # normal first-time / regular turn
+        result = await graph.ainvoke(
+            {"messages": [user_message]},
+            config=config,
+        )
+
+    # 3) Check if we hit a new interrupt
+    snapshot = graph.get_state(config)
+    if snapshot.tasks and snapshot.tasks[0].interrupts:
+        interrupt_value = snapshot.tasks[0].interrupts[0].value
+        return interrupt_value, tid
+
+    # 4) Otherwise, return the latest assistant message
+    latest_msg = result["messages"][-1].content
+    if isinstance(latest_msg, list):
+        last_text = latest_msg[-1].get("text", "")
+    else:
+        last_text = latest_msg
+
+    return last_text, tid
+
+def print_messages(message):
+    print(f"🧪 ➡️ {GREEN}{message}{RESET}")

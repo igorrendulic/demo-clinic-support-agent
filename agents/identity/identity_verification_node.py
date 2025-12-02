@@ -46,7 +46,7 @@ def new_patient_confirmation_request_node(state: ConversationState):
     }
 
 
-def identity_verification_node(state: ConversationState) -> Literal["ask_for_more_info_from_user", "ask_for_new_patient_confirmation", "handoff_to_appointment_agent"]:
+def identity_verification_node(state: ConversationState) -> dict:
     """
         Decides the next step:
         1. If tool calls exist -> update state.
@@ -62,8 +62,16 @@ def identity_verification_node(state: ConversationState) -> Literal["ask_for_mor
             return {
                 "user_verified": True,
                 "is_new_patient": False,
+                "user": user,
             }
         else:
+            number_of_corrections = state.get("identity_fullfillment_number_of_corrections", 0)
+            # exit the identity data correction loop
+            if number_of_corrections >= 3:
+                return {
+                    "user_verified": False,
+                    "is_new_patient": True,
+                }
             return {
                 "user_verified": False,
             }

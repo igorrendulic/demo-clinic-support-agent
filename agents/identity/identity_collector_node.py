@@ -46,6 +46,7 @@ def init_state(state: ConversationState) -> ConversationState:
     state["urgency_reason"] = "No urgency"
     state["is_new_patient"] = False
     state["user_verified"] = False
+    state["identity_fullfillment_number_of_corrections"] = 0
     return state
 
 def missing_required_fields(user: User | dict | None) -> list[str]:
@@ -139,29 +140,6 @@ def handle_tool_calls(response, user: User) -> User | None:
                 logger.error(f"Unknown tool call: {tool_call}. Ignoring...")
     return None
 
-# def ask_for_missing_identity_info_node(state: ConversationState) -> dict:
-#     """
-#     Asks the user for the missing identity information.
-#     """
-#     user = state.get("user")
-#     if user is None:
-#         user = init_state(state)
-    
-#     chain = identity_collector_missing_info_prompt | llm.bind_tools([UpdateInfo])
-
-#     template_params = user_to_prompt_vars(state)
-#     response = chain.invoke(template_params)
-    
-#     llm_logger.info(f"{response}")
-    
-#     updated_user = handle_tool_calls(response, user)
-#     if updated_user is not None:
-#         user = updated_user    
-
-#     return {
-#         "messages": [response],
-#         "user": user,
-#     }
 
 def identity_collector_node(state: ConversationState) -> dict:
     """

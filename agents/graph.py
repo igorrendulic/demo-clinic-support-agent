@@ -5,10 +5,17 @@ from langgraph.checkpoint.memory import InMemorySaver
 from agents.identity.identity_collector_node import identity_collector_node
 from agents.identity.identity_verification_node import identity_verification_node, new_patient_confirmation_request_node
 from agents.identity.new_patient_handoff import new_patient_handoff_node
-from agents.appointment.main_appointment_node import main_appointment_node
+from agents.appointment.primary_appointment_node import primary_appointment_node
+from agents.appointment.clear_history_node import cleanup_messages_middleware_node
+from agents.identity.identity_fullfillment_helper_node import identity_fullfillment_helper_node, validate_corrected_input, ask_user_to_correct_information
 from agents.models.user import User
 from agents.identity.identity_router import IdentityRoute, identity_routing_node
+from agents.appointment.list_appointment_node import list_appointments_node, list_appointments_node_tools
+from agents.appointment.add_appointment_node import add_appointment_node, add_appointment_node_tools
+from agents.appointment.util.helpers import Assistant, create_entry_node, create_tool_node_with_fallback, pop_appointment_stack_state
+from agents.appointment.appointment_router import AppointmentRoute, route_appointment_details, route_primary_appointment, route_add_appointment
 import os
+from agents.route_start import route_start
 
 def initialize_state(state: ConversationState) -> ConversationState:
    return {
@@ -30,15 +37,83 @@ workflow.add_node(IdentityRoute.IDENTITY_VERIFICATION_NODE, identity_verificatio
 # next steps for identity
 workflow.add_node(IdentityRoute.NEW_PATIENT_CONFIRMATION_REQUEST_NODE, new_patient_confirmation_request_node)
 workflow.add_node(IdentityRoute.REDIRECT_TO_NEW_PATIENT_HANDOFF, new_patient_handoff_node)
-workflow.add_node(IdentityRoute.MAIN_APPOINTMENT_NODE, main_appointment_node) # main appointment node
-# workflow.add_node(IdentityRoute.ASK_FOR_MISSING_IDENTITY_INFO, ask_for_missing_identity_info_node)
-
+workflow.add_node(IdentityRoute.PRIMARY_APPOINTMENT_NODE, primary_appointment_node) # main appointment node
+workflow.add_node(IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE, identity_fullfillment_helper_node)
+workflow.add_node(IdentityRoute.VALIDATE_CORRECTED_INPUT, validate_corrected_input)
+workflow.add_node(IdentityRoute.IDENTITY_ASK_USER_TO_CORRECT_INFORMATION, ask_user_to_correct_information)
+workflow.add_node(IdentityRoute.CLEANUP_MESSAGES_MIDDLEWARE_NODE, cleanup_messages_middleware_node)
 # always to go to verification after collecting the data (collector -> verification -> router)
 workflow.add_edge(IdentityRoute.IDENTITY_COLLECTOR_NODE, IdentityRoute.IDENTITY_VERIFICATION_NODE)
 workflow.add_edge(IdentityRoute.IDENTITY_VERIFICATION_NODE, IdentityRoute.IDENTITY_ROUTING_NODE)
 workflow.add_edge(IdentityRoute.NEW_PATIENT_CONFIRMATION_REQUEST_NODE, IdentityRoute.IDENTITY_ROUTING_NODE)
+workflow.add_edge(IdentityRoute.IDENTITY_ASK_USER_TO_CORRECT_INFORMATION, IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE)
+workflow.add_edge(IdentityRoute.CLEANUP_MESSAGES_MIDDLEWARE_NODE, IdentityRoute.PRIMARY_APPOINTMENT_NODE)
 
-workflow.add_edge(START, IdentityRoute.IDENTITY_COLLECTOR_NODE)
+workflow.add_conditional_edges(IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE, 
+    validate_corrected_input,
+    {
+        "success": IdentityRoute.CLEANUP_MESSAGES_MIDDLEWARE_NODE,
+        "failure": IdentityRoute.REDIRECT_TO_NEW_PATIENT_HANDOFF,
+        "retry": IdentityRoute.IDENTITY_ASK_USER_TO_CORRECT_INFORMATION,
+    }
+)
+
+# Start Router
+workflow.add_conditional_edges(START, 
+    route_start,
+    {
+        AppointmentRoute.PRIMARY_APPOINTMENT_NODE: AppointmentRoute.PRIMARY_APPOINTMENT_NODE,
+        IdentityRoute.IDENTITY_COLLECTOR_NODE: IdentityRoute.IDENTITY_COLLECTOR_NODE,
+        "add_appointment": "add_appointment",
+        "list_appointments": "list_appointments",
+    }
+)
+
+# Appontment part of the graph
+# List appointments assistant
+workflow.add_node(AppointmentRoute.ENTER_LIST_APPOINTMENTS_NODE, create_entry_node("Appointment List Assistant", "list_appointments"))
+workflow.add_node("list_appointments", list_appointments_node)
+workflow.add_edge(AppointmentRoute.ENTER_LIST_APPOINTMENTS_NODE, "list_appointments")
+workflow.add_node("list_appointment_safe_tools", create_tool_node_with_fallback(list_appointments_node_tools))
+workflow.add_edge("list_appointment_safe_tools", "list_appointments")
+workflow.add_conditional_edges("list_appointments", 
+    route_appointment_details,
+    {   
+        "leave_skill": "leave_skill",
+        "list_appointment_safe_tools": "list_appointment_safe_tools",
+        END: END,
+    }
+)
+
+workflow.add_node(AppointmentRoute.ENTER_ADD_APPOINTMENT_NODE, create_entry_node("Appointment Add Assistant", "add_appointment"))
+workflow.add_node("add_appointment", add_appointment_node)
+workflow.add_edge(AppointmentRoute.ENTER_ADD_APPOINTMENT_NODE, "add_appointment")
+workflow.add_node("add_appointment_safe_tools", create_tool_node_with_fallback(add_appointment_node_tools))
+workflow.add_edge("add_appointment_safe_tools", "add_appointment")
+workflow.add_conditional_edges("add_appointment",
+    route_add_appointment,
+    {
+        "leave_skill": "leave_skill",
+        "add_appointment_safe_tools": "add_appointment_safe_tools",
+        END: END,
+    }
+)
+
+# primary assistant
+# The assistant can route to one of the delegated assistants,
+# directly use a tool, or directly respond to the use
+workflow.add_conditional_edges(AppointmentRoute.PRIMARY_APPOINTMENT_NODE,
+    route_primary_appointment,
+    [
+        AppointmentRoute.ENTER_LIST_APPOINTMENTS_NODE,
+        AppointmentRoute.ENTER_ADD_APPOINTMENT_NODE,
+        AppointmentRoute.PRIMARY_APPOINTMENT_NODE,
+        END
+    ]
+)
+# return back to primary appointment node
+workflow.add_node("leave_skill", pop_appointment_stack_state)
+workflow.add_edge("leave_skill", AppointmentRoute.PRIMARY_APPOINTMENT_NODE)
 
 is_api_mode = os.getenv("RUN_MODE") == "api"
 print(f"is_api_mode: {is_api_mode}")
@@ -47,3 +122,8 @@ if is_api_mode:
     graph = workflow.compile(checkpointer=memory)
 else:
     graph = workflow.compile()
+
+os.makedirs("assets", exist_ok=True)
+png_bytes = graph.get_graph().draw_mermaid_png()
+with open("assets/graph.png", "wb") as f:
+    f.write(png_bytes)

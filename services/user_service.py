@@ -3,10 +3,10 @@ from datetime import date
 import re
 
 users:list[User] = [
-    User(name="John Doe", phone="111-111-1111", date_of_birth="1960-01-01", ssn_last_4="1111"),
-    User(name="Jim Beam", phone="222-222-2222", date_of_birth="1970-01-01", ssn_last_4="5678"),
-    User(name="Jill Johnson", phone="333-333-3333", date_of_birth="1980-01-01", ssn_last_4="9012"),
-    User(name="Jack Daniels", phone="444-444-4444", date_of_birth="1990-01-01", ssn_last_4="3456"),
+    User(id="1", name="John Doe", phone="111-111-1111", date_of_birth="1960-01-01", ssn_last_4="1111"),
+    User(id="2", name="Jim Beam", phone="222-222-2222", date_of_birth="1970-01-01", ssn_last_4="5678"),
+    User(id="3", name="Jill Johnson", phone="333-333-3333", date_of_birth="1980-01-01", ssn_last_4="9012"),
+    User(id="4", name="Jack Daniels", phone="444-444-4444", date_of_birth="1990-01-01", ssn_last_4="3456"),
 ]
 
 class UserService:

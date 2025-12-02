@@ -1,4 +1,4 @@
-from typing import Annotated, Sequence, TypedDict, Any
+from typing import Annotated, Literal, Sequence, TypedDict, Any
 
 from langgraph.graph.message import add_messages
 from agents.models.intent import Intent, IntentType
@@ -28,6 +28,17 @@ def add_active_intent(left: Intent | None, right: Intent | None) -> Intent | Non
         return right
     return left
 
+def update_appointment_stack_reducer(left: list[str], right: list[str]) -> list[str]:
+    """
+    Update the appointment stack reducer.
+    - Keep original order of first appearance of an item.
+    """
+    if right is None:
+        return left
+    if right == "pop":
+        return left[:-1]
+    return left + [right]
+
 class ConversationState(TypedDict):
     user: User = Field(default=None, description="The user's information")
     urgency_level: int = Field(default=1, description="The urgency level of the user's request")
@@ -37,3 +48,13 @@ class ConversationState(TypedDict):
     active_intent: Annotated[Intent | None, add_active_intent] # the intent that is currently being processed
     user_verified: bool = False # whether the user's identity has been verified
     is_new_patient: bool | None = None # whether the user is a new patient
+    identity_fullfillment_number_of_corrections: int = -1 # number of corrections made to the user's identity information
+    appointment_state: Annotated[
+        list[
+            Literal[
+                "primary_appointment_node",
+                "list_appointments",
+            ]
+        ],
+        update_appointment_stack_reducer
+    ] # the state of the appointment
