@@ -1,5 +1,5 @@
 from agents.models.state import ConversationState
-from agents.llms import get_llm_gemini_flash_light_latest
+from agents.llms import get_llm_mini_model
 from agents.identity.prompts.identity_assistant import identity_fullfillment_helper_prompt
 from langchain_core.messages import AIMessage
 from agents.identity.identity_collector_node import UpdateInfo, user_to_prompt_vars, handle_tool_calls
@@ -10,7 +10,7 @@ from agents.models.user import User
 from langchain_core.messages import HumanMessage, BaseMessage
 from langgraph.types import interrupt
 
-llm = get_llm_gemini_flash_light_latest(temperature=0.0)
+llm = get_llm_mini_model(temperature=0.0)
 
 user_service = UserService()
 

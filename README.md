@@ -6,4 +6,6 @@
 Define `.env`:
 ```
 GEMINI_API_KEY=key
+or 
+OPENAI_API_KEY=key
 ```

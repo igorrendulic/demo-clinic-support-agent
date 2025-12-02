@@ -9,6 +9,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 GREEN = "\033[92m"
 RESET = "\033[0m"
 
+BLUE = "\033[38;2;0;140;255m"
+
 root = pathlib.Path(__file__).resolve().parents[1]  # go up 1 directory
 sys.path.append(str(root))
 
@@ -62,5 +64,5 @@ async def run_graph_turn(message: str, thread_id: str | None = None) -> Tuple[st
 
     return last_text, tid
 
-def print_messages(message):
-    print(f"🧪 ➡️ {GREEN}{message}{RESET}")
+def print_messages(message, color: str = GREEN):
+    print(f"🧪 ➡️ {color}{message}{RESET}")

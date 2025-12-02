@@ -26,19 +26,3 @@ class CompleteOrEscalate(BaseModel):
         {"cancel": False, "reason": "I need to search the user's appointments for more information."},
      ]
     )
-
-    # class Config:
-    #     json_schema_extra = {
-    #         "example": {
-    #             "cancel": True,
-    #             "reason": "User changed their mind about the current task.",
-    #         },
-    #         "example 2": {
-    #             "cancel": True,
-    #             "reason": "I have fully completed the task.",
-    #         },
-    #         "example 3": {
-    #             "cancel": False,
-    #             "reason": "I need to search the user's appointments for more information.",
-    #         },
-    #     }

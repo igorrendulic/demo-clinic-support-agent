@@ -4,27 +4,7 @@ from agents.models.state import ConversationState
 from pydantic import BaseModel
 from typing import Optional
 from langchain_core.messages import ToolMessage
-from agents.llms import get_llm_gemini_flash_light_latest
-from agents.prompts.primary_assistant import primary_assistant_prompt
-
-class Assistant:
-    def __init__(self, runnable: Runnable):
-        self.runnable = runnable
-
-    def __call__(self, state: ConversationState, config: RunnableConfig):
-        while True:
-            result = self.runnable.invoke(state)
-
-            if not result.tool_calls and (
-                not result.content
-                or isinstance(result.content, list)
-                and not result.content[0].get("text")
-            ):
-                messages = state["messages"] + [("user", "Respond with a real output.")]
-                state = {**state, "messages": messages}
-            else:
-                break
-        return {"messages": result}
+from agents.llms import get_llm_mini_model
 
 class CompleteOrEscalate(BaseModel):
     """A tool to mark the current task as completed and/or to escalate control of the dialog to the main assistant,
@@ -70,4 +50,4 @@ def pop_dialog_state(state: ConversationState) -> dict:
         "messages": messages,
     }
 
-assitant_runnable_agent = primary_assistant_prompt | get_llm_gemini_flash_light_latest().bind_tools([]) # TODO: add tools
+# assitant_runnable_agent = primary_assistant_prompt | get_llm_mini_model().bind_tools([]) # TODO: add tools

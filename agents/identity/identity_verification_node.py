@@ -4,14 +4,14 @@ from typing import Literal
 from services.user_service import UserService
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
-from agents.llms import get_llm_gemini_flash_light_latest
+from agents.llms import get_llm_mini_model
 from langchain_core.messages import SystemMessage
 from langgraph.types import interrupt
 from logging_config import llm_logger
 
 user_service = UserService()
 
-llm = get_llm_gemini_flash_light_latest(temperature=0.0)
+llm = get_llm_mini_model(temperature=0.0)
 
 class NewPatientIntent(BaseModel):
     """Classify the user's intent regarding their patient status."""

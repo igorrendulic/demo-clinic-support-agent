@@ -17,6 +17,14 @@ class AppointmentConflictError(Exception):
     def __init__(self, message="New appointment already falls in exsting doctors term. Please choose a different time or provider."):
         super().__init__(message)
 
+class AppointmentNotFoundError(Exception):
+    def __init__(self, message="Appointment not found"):
+        super().__init__(message)
+
+class MultipleAppointmentsFoundError(Exception):
+    def __init__(self, message="Multiple appointments found for the same date. Please choose one from the following list."):
+        super().__init__(message)
+
 class AppointmentService:
     def __init__(self):
         self.appointments: list[Appointment] = []
@@ -26,12 +34,12 @@ class AppointmentService:
         in_two_weeks = today + timedelta(days=14)
         self.appointments = [
             Appointment(id="1", user_id="1", date=today.strftime("%Y-%m-%d"), time="10:00", location="123 Main St, Anytown, USA", provider="Dr. Lang Smith", reason="Annual physical", status="Confirmed"),
-            Appointment(id="1", user_id="1", date=tomorrow.strftime("%Y-%m-%d"), time="11:00", location="456 Main St, Anytown, USA", provider="Dr. Lang Smith", reason="Follow-up", status="Confirmed"),
-            Appointment(id="1", user_id="1", date=in_two_weeks.strftime("%Y-%m-%d"), time="12:00", location="456 Main St, Anytown, USA", provider="Dr. Lang Smith", reason="Check up", status="Confirmed"),
-            Appointment(id="3", user_id="2", date=today.strftime("%Y-%m-%d"), time="12:00", location="789 Main St, Anytown, USA", provider="Dr. Jim Beam", reason="Annual physical", status="Confirmed"),
-            Appointment(id="4", user_id="2", date=tomorrow.strftime("%Y-%m-%d"), time="13:00", location="101 Main St, Anytown, USA", provider="Dr. Jill Johnson", reason="Follow-up", status="Confirmed"),
-            Appointment(id="5", user_id="3", date=next_week.strftime("%Y-%m-%d"), time="14:00", location="123 Main St, Anytown, USA", provider="Dr. Jack Daniels", reason="Annual physical", status="Confirmed"),
-            Appointment(id="6", user_id="3", date=in_two_weeks.strftime("%Y-%m-%d"), time="15:00", location="456 Main St, Anytown, USA", provider="Dr. Jim Beam", reason="Follow-up", status="Confirmed"),
+            Appointment(id="2", user_id="1", date=tomorrow.strftime("%Y-%m-%d"), time="11:00", location="456 Main St, Anytown, USA", provider="Dr. Lang Smith", reason="Follow-up", status="Confirmed"),
+            Appointment(id="3", user_id="1", date=in_two_weeks.strftime("%Y-%m-%d"), time="12:00", location="456 Main St, Anytown, USA", provider="Dr. Lang Smith", reason="Check up", status="Confirmed"),
+            Appointment(id="4", user_id="2", date=today.strftime("%Y-%m-%d"), time="12:00", location="789 Main St, Anytown, USA", provider="Dr. Jim Beam", reason="Annual physical", status="Confirmed"),
+            Appointment(id="5", user_id="2", date=tomorrow.strftime("%Y-%m-%d"), time="13:00", location="101 Main St, Anytown, USA", provider="Dr. Jill Johnson", reason="Follow-up", status="Confirmed"),
+            Appointment(id="6", user_id="3", date=next_week.strftime("%Y-%m-%d"), time="14:00", location="123 Main St, Anytown, USA", provider="Dr. Jack Daniels", reason="Annual physical", status="Confirmed"),
+            Appointment(id="7", user_id="3", date=in_two_weeks.strftime("%Y-%m-%d"), time="15:00", location="456 Main St, Anytown, USA", provider="Dr. Jim Beam", reason="Follow-up", status="Confirmed"),
         ]
 
     def get_appointments(self, user_id: str) -> list[Appointment]:
@@ -48,6 +56,11 @@ class AppointmentService:
         
         self.appointments.append(appointment)
         return appointment
+
+    def check_conflict(self, appointment: Appointment) -> None:
+        for a in self.appointments:
+            if a.provider == appointment.provider and a.date == appointment.date and a.time == appointment.time:
+                raise AppointmentConflictError("New appointment falls in exsting doctors term. Please choose a different time or provider.")
 
     def update_appointment(self, appointment: Appointment) -> Appointment:
         for i, a in enumerate(self.appointments):
@@ -113,3 +126,47 @@ class AppointmentService:
         available = [s for s in all_slots if s not in booked]
 
         return available
+
+    def find_appointments_for_user(self, appointment: Appointment) -> list[Appointment]:
+        """
+        Find appointments for a user for a specific date.
+        Args:
+        - appointment: The appointment to find
+        Returns:
+        - A list of appointments for the user on the given date
+        - If time is provided, return the appointment at that time
+        Raises:
+        - AppointmentNotFoundError: If the appointment is not found
+        - MultipleAppointmentsFoundError: If multiple appointments are found for the same date
+        """
+        if not appointment.user_id or not appointment.date:
+            raise AppointmentNotFoundError("User id or date not found")
+        
+        found_appointments = []
+        for i, a in enumerate(self.appointments):
+            if a.user_id == appointment.user_id and a.date == appointment.date:
+                found_appointments.append(a)
+        if len(found_appointments) == 0:
+            raise AppointmentNotFoundError("Appointment not found")
+        if len(found_appointments) > 1:
+            if appointment.time:
+                found_appointments = [a for a in found_appointments if a.time == appointment.time]
+            
+        return found_appointments
+
+    def cancel_appointment_by_id(self, appointment_id: str) -> Appointment:
+        """
+        Cancel an appointment by id.
+        Args:
+        - appointment_id: The id of the appointment to cancel
+        Returns:
+        - The appointment that was cancelled
+        """
+        if not appointment_id:
+            raise AppointmentNotFoundError("Appointment id not found")
+        
+        for i, a in enumerate(self.appointments):
+            if a.id == appointment_id:
+                self.appointments[i].status = "Cancelled"
+                return a
+        raise AppointmentNotFoundError("Appointment not found")

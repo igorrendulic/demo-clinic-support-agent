@@ -1,4 +1,4 @@
-from agents.llms import get_llm_gemini_flash_light_latest
+from agents.llms import get_llm_mini_model
 from agents.models.state import ConversationState
 from agents.models.user import User
 from langgraph.graph import END
@@ -11,7 +11,7 @@ from agents.identity.prompts.identity_assistant import identity_collector_prompt
 
 user_service = UserService()
 
-llm = get_llm_gemini_flash_light_latest(temperature=0.0)
+llm = get_llm_mini_model(temperature=0.0)
 
 class UpdateInfo(BaseModel):
     """

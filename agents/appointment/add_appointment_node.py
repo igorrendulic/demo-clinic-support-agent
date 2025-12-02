@@ -1,16 +1,17 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from agents.models.state import ConversationState
-from agents.llms import get_llm_gemini_flash_light_latest
+from agents.llms import get_llm_mini_model
 from logging_config import logger, llm_logger
-from agents.appointment.tools.appointments import add_appointment
+from agents.appointment.tools.appointments import check_appointment, commit_appointment
 from agents.appointment.complete_or_escalate import CompleteOrEscalate
 from agents.appointment.prompts.appointment_prompts import add_appointment_prompt
 from agents.appointment.util.helpers import appointment_template_params
+from agents.appointment.tools.confirmations import confirm_appointment_tool
 
-llm = get_llm_gemini_flash_light_latest(temperature=0.0)
+llm = get_llm_mini_model(temperature=0.0)
 
-add_appointment_node_tools = [add_appointment]
+add_appointment_node_tools = [check_appointment, commit_appointment, confirm_appointment_tool]
 
 class ToAddAppointment(BaseModel):
     """

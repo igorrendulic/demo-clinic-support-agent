@@ -1,29 +1,11 @@
 from typing import Callable
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from agents.models.state import ConversationState
 from langchain_core.runnables import RunnableLambda
 from langgraph.prebuilt import ToolNode
-from langgraph.graph.state import RunnableConfig
-from langchain_core.runnables import Runnable, RunnableLambda
+from agents.llms import get_llm_mini_model
 
-class Assistant:
-    def __init__(self, runnable: Runnable):
-        self.runnable = runnable
-    
-    def __call__(self, state: ConversationState, config: RunnableConfig):
-        while True:
-            result = self.runnable.invoke(state)
-
-            if not result.tool_calls and (
-                not result.content
-                or isinstance(result.content, list)
-                and not result.content[0].get("text")
-            ):
-                messages = state["messages"] + [("user", "Respond with a real output.")]
-                state = {**state, "messages": messages}
-            else:
-                break
-        return {"messages": result}
+llm_model = get_llm_mini_model()
 
 def create_entry_node(assistant_name: str, new_appointment_state: str) -> Callable:
     def appointment_entry_node(state: ConversationState) -> dict:
@@ -91,7 +73,13 @@ def appointment_template_params(state: ConversationState):
     user = state.get("user")
     messages = state.get("messages", [])
     if len(messages) == 0:
-        messages = [HumanMessage(content="Respond with a real output.")]
+        # check if llm is google, then add human message (like hello or insert previous intent)
+        # otherwise add systemmessage
+        llm_model_name = llm_model.model_name
+        if llm_model_name.startswith("gemini"):
+            messages = [HumanMessage(content="Hi")]
+        else:
+            messages = [SystemMessage(content="Respond either with a tool call or a message to the user or both if needed.")]
     
     name = getattr(user, "name", None) if user is not None else None
 

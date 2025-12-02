@@ -3,7 +3,7 @@ from agents.models.state import ConversationState
 
 def cleanup_messages_middleware_node(state: ConversationState) -> dict:
     """
-    Node: clear the history of the conversation
+    Node: clear the history of the conversation (reducing potential LLM hallucinations)
     """
     removal_instructions = [
         RemoveMessage(id = m.id) for m in state.get("messages", [])

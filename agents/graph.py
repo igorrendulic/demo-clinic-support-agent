@@ -10,10 +10,12 @@ from agents.appointment.clear_history_node import cleanup_messages_middleware_no
 from agents.identity.identity_fullfillment_helper_node import identity_fullfillment_helper_node, validate_corrected_input, ask_user_to_correct_information
 from agents.models.user import User
 from agents.identity.identity_router import IdentityRoute, identity_routing_node
-from agents.appointment.list_appointment_node import list_appointments_node, list_appointments_node_tools
+from agents.appointment.cancel_appointment_node import cancel_appointment_node, cancel_appointment_node_tools
 from agents.appointment.add_appointment_node import add_appointment_node, add_appointment_node_tools
-from agents.appointment.util.helpers import Assistant, create_entry_node, create_tool_node_with_fallback, pop_appointment_stack_state
-from agents.appointment.appointment_router import AppointmentRoute, route_appointment_details, route_primary_appointment, route_add_appointment
+from agents.appointment.util.helpers import create_entry_node, create_tool_node_with_fallback, pop_appointment_stack_state
+from agents.appointment.appointment_router import AppointmentRoute, route_primary_appointment, route_add_appointment, route_cancel_appointment
+from agents.appointment.primary_appointment_node import primary_appointment_node_tools
+
 import os
 from agents.route_start import route_start
 
@@ -65,26 +67,13 @@ workflow.add_conditional_edges(START,
         AppointmentRoute.PRIMARY_APPOINTMENT_NODE: AppointmentRoute.PRIMARY_APPOINTMENT_NODE,
         IdentityRoute.IDENTITY_COLLECTOR_NODE: IdentityRoute.IDENTITY_COLLECTOR_NODE,
         "add_appointment": "add_appointment",
-        "list_appointments": "list_appointments",
+        "cancel_appointment": "cancel_appointment",
+        # "reschedule_appointment": "reschedule_appointment",
     }
 )
 
 # Appontment part of the graph
-# List appointments assistant
-workflow.add_node(AppointmentRoute.ENTER_LIST_APPOINTMENTS_NODE, create_entry_node("Appointment List Assistant", "list_appointments"))
-workflow.add_node("list_appointments", list_appointments_node)
-workflow.add_edge(AppointmentRoute.ENTER_LIST_APPOINTMENTS_NODE, "list_appointments")
-workflow.add_node("list_appointment_safe_tools", create_tool_node_with_fallback(list_appointments_node_tools))
-workflow.add_edge("list_appointment_safe_tools", "list_appointments")
-workflow.add_conditional_edges("list_appointments", 
-    route_appointment_details,
-    {   
-        "leave_skill": "leave_skill",
-        "list_appointment_safe_tools": "list_appointment_safe_tools",
-        END: END,
-    }
-)
-
+# Book appointments assistant
 workflow.add_node(AppointmentRoute.ENTER_ADD_APPOINTMENT_NODE, create_entry_node("Appointment Add Assistant", "add_appointment"))
 workflow.add_node("add_appointment", add_appointment_node)
 workflow.add_edge(AppointmentRoute.ENTER_ADD_APPOINTMENT_NODE, "add_appointment")
@@ -99,18 +88,36 @@ workflow.add_conditional_edges("add_appointment",
     }
 )
 
+# cancel appointment assistant
+workflow.add_node(AppointmentRoute.ENTER_CANCEL_APPOINTMENT_NODE, create_entry_node("Appointment Cancel Assistant", "cancel_appointment"))
+workflow.add_node("cancel_appointment", cancel_appointment_node)
+workflow.add_edge(AppointmentRoute.ENTER_CANCEL_APPOINTMENT_NODE, "cancel_appointment")
+workflow.add_node("cancel_appointment_safe_tools", create_tool_node_with_fallback(cancel_appointment_node_tools))
+workflow.add_edge("cancel_appointment_safe_tools", "cancel_appointment")
+workflow.add_conditional_edges("cancel_appointment",
+    route_cancel_appointment,
+    {
+        "leave_skill": "leave_skill",
+        "cancel_appointment_safe_tools": "cancel_appointment_safe_tools",
+        END: END,
+    }
+)
+
 # primary assistant
 # The assistant can route to one of the delegated assistants,
 # directly use a tool, or directly respond to the use
+workflow.add_node("primary_appointment_node_tools", create_tool_node_with_fallback(primary_appointment_node_tools))
 workflow.add_conditional_edges(AppointmentRoute.PRIMARY_APPOINTMENT_NODE,
     route_primary_appointment,
     [
-        AppointmentRoute.ENTER_LIST_APPOINTMENTS_NODE,
+        AppointmentRoute.ENTER_CANCEL_APPOINTMENT_NODE,
         AppointmentRoute.ENTER_ADD_APPOINTMENT_NODE,
-        AppointmentRoute.PRIMARY_APPOINTMENT_NODE,
+        # AppointmentRoute.ENTER_RESCHEDULE_APPOINTMENT_NODE,
+        "primary_appointment_node_tools",
         END
     ]
 )
+workflow.add_edge("primary_appointment_node_tools", AppointmentRoute.PRIMARY_APPOINTMENT_NODE)
 # return back to primary appointment node
 workflow.add_node("leave_skill", pop_appointment_stack_state)
 workflow.add_edge("leave_skill", AppointmentRoute.PRIMARY_APPOINTMENT_NODE)
