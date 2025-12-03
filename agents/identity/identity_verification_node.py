@@ -8,8 +8,7 @@ from agents.llms import get_llm_mini_model
 from langchain_core.messages import SystemMessage
 from langgraph.types import interrupt
 from logging_config import llm_logger
-
-user_service = UserService()
+from services.user_service import user_service
 
 llm = get_llm_mini_model(temperature=0.0)
 

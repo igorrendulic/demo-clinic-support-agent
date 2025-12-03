@@ -3,11 +3,11 @@ from typing import Optional
 from agents.models.state import ConversationState
 from agents.llms import get_llm_mini_model
 from logging_config import logger, llm_logger
-from agents.appointment.tools.appointments import check_appointment, commit_appointment
+from agents.appointment.tools.appointment_tools import check_appointment, commit_appointment
 from agents.appointment.complete_or_escalate import CompleteOrEscalate
 from agents.appointment.prompts.appointment_prompts import add_appointment_prompt
 from agents.appointment.util.helpers import appointment_template_params
-from agents.appointment.tools.confirmations import confirm_appointment_tool
+from agents.appointment.tools.confirmation_tools import confirm_appointment_tool
 
 llm = get_llm_mini_model(temperature=0.0)
 
@@ -27,7 +27,7 @@ class ToAddAppointment(BaseModel):
         ]
     )
 
-def add_appointment_node(state: ConversationState) -> dict:
+async def add_appointment_node(state: ConversationState) -> dict:
     """
     Node: add appointment node
     - Adds an appointment for the user
@@ -35,10 +35,8 @@ def add_appointment_node(state: ConversationState) -> dict:
 
     chain = add_appointment_prompt | llm.bind_tools(add_appointment_node_tools + [CompleteOrEscalate])
     prompts_template = appointment_template_params(state)
-    response = chain.invoke(prompts_template)
+    response = await chain.ainvoke(prompts_template)
 
     llm_logger.info(f"add_appointment_node: response: {response}")
 
-    return {
-        "messages": [response],
-    }
+    return {"messages": [response]}

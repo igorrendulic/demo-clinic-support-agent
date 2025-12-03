@@ -4,8 +4,7 @@ from langgraph.types import Command
 from typing import Literal
 from enum import StrEnum
 from langgraph.graph import END
-
-user_service = UserService()
+from services.user_service import user_service
 
 # 
 class IdentityRoute(StrEnum):

@@ -9,10 +9,9 @@ from typing import Tuple, List, Literal
 from agents.models.user import User
 from langchain_core.messages import HumanMessage, BaseMessage
 from langgraph.types import interrupt
+from services.user_service import user_service
 
 llm = get_llm_mini_model(temperature=0.0)
-
-user_service = UserService()
 
 def ask_user_to_correct_information(state: ConversationState):
     """

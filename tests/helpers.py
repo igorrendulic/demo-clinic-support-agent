@@ -15,6 +15,7 @@ root = pathlib.Path(__file__).resolve().parents[1]  # go up 1 directory
 sys.path.append(str(root))
 
 from agents.graph import workflow # graph instance
+
 inmemory = InMemorySaver()
 graph = workflow.compile(checkpointer=inmemory)
 

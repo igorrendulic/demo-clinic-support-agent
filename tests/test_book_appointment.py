@@ -1,6 +1,7 @@
 import pytest
 import asyncio
 from helpers import print_messages, run_graph_turn, BLUE, GREEN
+from services.appointment_service import appointment_service
 import os
 
 @pytest.mark.anyio
@@ -19,6 +20,11 @@ async def test_book_appointment():
         print_messages(f"🧑 user message: {message}", BLUE)
         reply, tid = await run_graph_turn(message, thread_id)
         print_messages(f"🤖 assistant message: {reply}", GREEN)
-   
+
+    # list appointments
+    appointments = appointment_service.list_all_appointments()
+    for appointment in appointments:
+        print_messages(f"💬 appointment: {appointment.model_dump()}", GREEN)
+
 if __name__ == "__main__":
     asyncio.run(test_book_appointment())

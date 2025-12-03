@@ -1,11 +1,12 @@
 from pydantic import BaseModel, Field
-from agents.appointment.tools.appointments import cancel_appointment
 from agents.llms import get_llm_mini_model
 from agents.appointment.prompts.appointment_prompts import cancel_appointment_prompt
 from agents.appointment.complete_or_escalate import CompleteOrEscalate
 from typing import Optional
 from agents.models.state import ConversationState
 from agents.appointment.util.helpers import appointment_template_params
+from agents.appointment.tools.appointment_tools import find_appointment_tool, commit_cancel_appointment
+from agents.appointment.tools.confirmation_tools import confirm_appointment_tool
 
 class ToCancelAppointment(BaseModel):
     """
@@ -23,9 +24,9 @@ class ToCancelAppointment(BaseModel):
 
 llm = get_llm_mini_model(temperature=0.0)
 
-cancel_appointment_node_tools = [cancel_appointment]
+cancel_appointment_node_tools = [find_appointment_tool, confirm_appointment_tool, commit_cancel_appointment]
 
-def cancel_appointment_node(state: ConversationState) -> dict:
+async def cancel_appointment_node(state: ConversationState) -> dict:
     """
     Node: cancel appointment node
     - Cancels the user's appointment
@@ -35,8 +36,6 @@ def cancel_appointment_node(state: ConversationState) -> dict:
     chain = cancel_appointment_prompt | llm.bind_tools(cancel_appointment_node_tools + [CompleteOrEscalate])
 
     prompts_template = appointment_template_params(state)
-    response = chain.invoke(prompts_template)
+    response = await chain.ainvoke(prompts_template)
 
-    return {
-        "messages": [response],
-    }
+    return {"messages": [response]}

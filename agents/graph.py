@@ -15,6 +15,8 @@ from agents.appointment.add_appointment_node import add_appointment_node, add_ap
 from agents.appointment.util.helpers import create_entry_node, create_tool_node_with_fallback, pop_appointment_stack_state
 from agents.appointment.appointment_router import AppointmentRoute, route_primary_appointment, route_add_appointment, route_cancel_appointment
 from agents.appointment.primary_appointment_node import primary_appointment_node_tools
+from agents.appointment.reschedule_appointment_node import reschedule_appointment_node, reschedule_appointment_node_tools
+from agents.appointment.appointment_router import route_reschedule_appointment
 
 import os
 from agents.route_start import route_start
@@ -68,7 +70,7 @@ workflow.add_conditional_edges(START,
         IdentityRoute.IDENTITY_COLLECTOR_NODE: IdentityRoute.IDENTITY_COLLECTOR_NODE,
         "add_appointment": "add_appointment",
         "cancel_appointment": "cancel_appointment",
-        # "reschedule_appointment": "reschedule_appointment",
+        "reschedule_appointment": "reschedule_appointment",
     }
 )
 
@@ -103,6 +105,22 @@ workflow.add_conditional_edges("cancel_appointment",
     }
 )
 
+# reschedule appointment assistant
+# cancel appointment assistant
+workflow.add_node(AppointmentRoute.ENTER_RESCHEDULE_APPOINTMENT_NODE, create_entry_node("Appointment Reschedule Assistant", "reschedule_appointment"))
+workflow.add_node("reschedule_appointment", reschedule_appointment_node)
+workflow.add_edge(AppointmentRoute.ENTER_RESCHEDULE_APPOINTMENT_NODE, "reschedule_appointment")
+workflow.add_node("reschedule_appointment_safe_tools", create_tool_node_with_fallback(reschedule_appointment_node_tools))
+workflow.add_edge("reschedule_appointment_safe_tools", "reschedule_appointment")
+workflow.add_conditional_edges("reschedule_appointment",
+    route_reschedule_appointment,
+    {
+        "leave_skill": "leave_skill",
+        "reschedule_appointment_safe_tools": "reschedule_appointment_safe_tools",
+        END: END,
+    }
+)
+
 # primary assistant
 # The assistant can route to one of the delegated assistants,
 # directly use a tool, or directly respond to the use
@@ -112,7 +130,7 @@ workflow.add_conditional_edges(AppointmentRoute.PRIMARY_APPOINTMENT_NODE,
     [
         AppointmentRoute.ENTER_CANCEL_APPOINTMENT_NODE,
         AppointmentRoute.ENTER_ADD_APPOINTMENT_NODE,
-        # AppointmentRoute.ENTER_RESCHEDULE_APPOINTMENT_NODE,
+        AppointmentRoute.ENTER_RESCHEDULE_APPOINTMENT_NODE,
         "primary_appointment_node_tools",
         END
     ]

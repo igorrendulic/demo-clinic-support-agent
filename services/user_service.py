@@ -47,3 +47,5 @@ class UserService:
             if db_user_name == name and db_user_date_of_birth == date_of_birth and db_user_phone == phone_number:
                 return user
         return None
+
+user_service = UserService()

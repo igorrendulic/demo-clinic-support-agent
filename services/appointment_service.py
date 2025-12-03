@@ -45,10 +45,16 @@ class AppointmentService:
     def get_appointments(self, user_id: str) -> list[Appointment]:
         return [appointment for appointment in self.appointments if appointment.user_id == user_id]
 
+    def list_all_appointments(self) -> list[Appointment]:
+        return self.appointments
+
     def add_appointment(self, appointment: Appointment) -> Appointment:
         if appointment.id is None:
             appointment.id = str(len(self.appointments) + 1)
         
+        if not appointment.provider:
+            raise AppointmentConflictError("Provider does not exist")
+
         # check if new appointment already falls in exsting doctors term
         for a in self.appointments:
             if a.provider == appointment.provider and a.date == appointment.date and a.time == appointment.time:
@@ -70,7 +76,10 @@ class AppointmentService:
         return None
 
     def delete_appointment(self, appointment: Appointment) -> bool:
-        self.appointments = [a for a in self.appointments if a.id != appointment.id and a.user_id != appointment.user_id]
+        self.appointments = [
+           a for a in self.appointments
+           if not (a.id == appointment.id and a.user_id == appointment.user_id)
+        ]
         return True
 
     def list_all_doctors(self) -> list[str]:
@@ -161,12 +170,65 @@ class AppointmentService:
         - appointment_id: The id of the appointment to cancel
         Returns:
         - The appointment that was cancelled
+        - raises AppointmentNotFoundError if appointment not found
         """
         if not appointment_id:
             raise AppointmentNotFoundError("Appointment id not found")
         
         for i, a in enumerate(self.appointments):
             if a.id == appointment_id:
-                self.appointments[i].status = "Cancelled"
-                return a
+                removed = self.appointments.pop(i)
+                return removed
+
         raise AppointmentNotFoundError("Appointment not found")
+
+    def get_doctor_location(self, provider: str) -> str:
+        """
+        Get the location of a doctor.
+        Args:
+        - provider: The provider to get the location for
+        Returns:
+        - The location of the doctor
+        """
+        for a in self.appointments:
+            if a.provider == provider:
+                return a.location
+        return None
+
+    def reschedule_appointment(self, appointment_id: str, new_date: str, new_time: str) -> Appointment:
+        """
+        Reschedule an appointment by id.
+        Args:
+        - appointment_id: The id of the appointment to reschedule
+        - new_date: The new date to reschedule the appointment to
+        - new_time: The new time to reschedule the appointment to
+        Returns:
+        - The appointment that was rescheduled
+        - raises AppointmentNotFoundError if appointment not found
+        - raises AppointmentConflictError if there is conflicts in new_date and new_time with existing appointments
+        """
+        # get appointment by id: 
+        for a in self.appointments:
+            if a.id == appointment_id:
+                appointment = a
+                break
+            
+        if not appointment:
+            raise AppointmentNotFoundError("Appointment not found")
+        
+        # check if there is conflicts in new_date and new_time with existing appointments
+        for a in self.appointments:
+            if a.provider == appointment.provider and a.date == new_date and a.time == new_time:
+                raise AppointmentConflictError("New appointment falls in exsting doctors term. Please choose a different time or provider.")
+        
+        # update the appointment
+        for i, a in enumerate(self.appointments):
+            if a.id == appointment.id:
+                self.appointments[i].date = new_date
+                self.appointments[i].time = new_time
+                return a
+
+        raise AppointmentNotFoundError("Appointment not found")
+
+
+appointment_service = AppointmentService()

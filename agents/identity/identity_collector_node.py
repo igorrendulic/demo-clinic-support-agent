@@ -4,12 +4,10 @@ from agents.models.user import User
 from langgraph.graph import END
 from typing import Optional
 from pydantic import BaseModel, Field
-from services.user_service import UserService
+from services.user_service import user_service
 from logging_config import llm_logger, logger
 from langchain_core.messages import AIMessage
 from agents.identity.prompts.identity_assistant import identity_collector_prompt
-
-user_service = UserService()
 
 llm = get_llm_mini_model(temperature=0.0)
 
