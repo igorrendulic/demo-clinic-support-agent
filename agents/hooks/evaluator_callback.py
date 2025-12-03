@@ -121,18 +121,18 @@ class EvaluatorCallbackHandler(AsyncCallbackHandler):
                 "answer": ai.content,
                 "context": "",
             }
-            qa_evaluator_logger.info(f"Human: {human.content!r},\n\nAI: {ai.content!r}")
-            result: AnswerQuality = await self._eval_chain.ainvoke(eval_input)
-            qa_evaluator_logger.info(
-                f"QA_EVAL: "
-                f"overall={result.overall_score:.2f}, "
-                f"rel_acc={result.answer_relevance_accuracy}, "
-                f"user_need={result.user_need_relevance}, "
-                f"grounded={result.groundedness}, "
-                f"human={human.content!r}, "
-                f"ai={ai.content!r}, "
-                f"explanation={result.explanation}"
-            )
+            qa_evaluator_logger.info(f"QA_EVAL: eval_input={eval_input}")
+            # result: AnswerQuality = await self._eval_chain.ainvoke(eval_input)
+            # qa_evaluator_logger.info(
+            #     f"QA_EVAL: "
+            #     f"overall={result.overall_score:.2f}, "
+            #     f"rel_acc={result.answer_relevance_accuracy}, "
+            #     f"user_need={result.user_need_relevance}, "
+            #     f"grounded={result.groundedness}, "
+            #     f"human={human.content!r}, "
+            #     f"ai={ai.content!r}, "
+            #     f"explanation={result.explanation}"
+            # )
         except Exception as e:
             qa_evaluator_logger.error(f"QA_EVAL: error={e}")
         

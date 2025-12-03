@@ -48,10 +48,10 @@ def custom_formatter(record):
     if record["extra"].get("type") == "qa_evaluator":
        return (
             "<green>{time:HH:mm:ss}</green> | "
-            "<level>{level: <8}</level> | "
-            "<bold><red>🧠 QA EVALUATOR:</red></bold>\n"
-            "<red>{message}</red>\n"
-            "<bold><red>--------------------------------------------------</red></bold>\n"
+            "<level>{level:<8}</level> | "
+            "<dim><light-black>🧠 QA EVALUATOR:</light-black></dim>\n"
+            "<dim><light-black>{message}</light-black></dim>\n"
+            "<dim><light-black>--------------------------------------------------</light-black></dim>\n"
         )
     
     # Default logging format

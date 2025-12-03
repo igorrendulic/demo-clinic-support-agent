@@ -53,8 +53,6 @@ def list_appointments(user: Annotated[User, InjectedState("user")]) -> list[dict
             key=lambda x: datetime.strptime(f"{x.date} {x.time}", "%Y-%m-%d %H:%M")
         )
     
-    for appointment in appointments:
-        logger.info(f"list_appointments: appointment: {appointment.model_dump()}")
     return [appointment.model_dump() for appointment in appointments]
 
 @tool
