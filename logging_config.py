@@ -45,7 +45,15 @@ def custom_formatter(record):
             "<cyan>{message}</cyan>\n"
             "<magenta>--------------------------------------------------</magenta>\n"
         )
-
+    if record["extra"].get("type") == "qa_evaluator":
+       return (
+            "<green>{time:HH:mm:ss}</green> | "
+            "<level>{level: <8}</level> | "
+            "<bold><red>🧠 QA EVALUATOR:</red></bold>\n"
+            "<red>{message}</red>\n"
+            "<bold><red>--------------------------------------------------</red></bold>\n"
+        )
+    
     # Default logging format
     return (
         "<green>{time:HH:mm:ss}</green> | "
@@ -59,5 +67,6 @@ logger.add(sys.stderr, format=custom_formatter, colorize=True)
 
 # 3. Create and export the bound logger
 llm_logger = logger.bind(type="llm")
+qa_evaluator_logger = logger.bind(type="qa_evaluator")
 
-__all__ = ["logger", "llm_logger"]
+__all__ = ["logger", "llm_logger", "qa_evaluator_logger"]

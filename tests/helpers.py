@@ -15,9 +15,12 @@ root = pathlib.Path(__file__).resolve().parents[1]  # go up 1 directory
 sys.path.append(str(root))
 
 from agents.graph import workflow # graph instance
+from agents.hooks.evaluator_callback import EvaluatorCallbackHandler
 
 inmemory = InMemorySaver()
 graph = workflow.compile(checkpointer=inmemory)
+
+eval_callback = EvaluatorCallbackHandler()
 
 async def run_graph_turn(message: str, thread_id: str | None = None) -> Tuple[str, str]:
     """
@@ -26,7 +29,11 @@ async def run_graph_turn(message: str, thread_id: str | None = None) -> Tuple[st
     """
 
     tid = thread_id or str(uuid.uuid4())
-    config = {"configurable": {"thread_id": tid}}
+    config = {"configurable": 
+        {"thread_id": tid},
+        "callbacks": [eval_callback]
+    }
+    
     user_message = HumanMessage(content=message)
 
     # 1) Get current state for this thread
@@ -48,10 +55,11 @@ async def run_graph_turn(message: str, thread_id: str | None = None) -> Tuple[st
         result = await graph.ainvoke(
             {"messages": [user_message]},
             config=config,
+        
         )
 
     # 3) Check if we hit a new interrupt
-    snapshot = graph.get_state(config)
+    snapshot = await graph.aget_state(config)
     if snapshot.tasks and snapshot.tasks[0].interrupts:
         interrupt_value = snapshot.tasks[0].interrupts[0].value
         return interrupt_value, tid

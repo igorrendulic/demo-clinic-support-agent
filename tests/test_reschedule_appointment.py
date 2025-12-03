@@ -23,6 +23,5 @@ async def test_reschedule_appointment():
         print_messages(f"🤖 assistant message: {reply}", GREEN)
 
     
-
 if __name__ == "__main__":
     asyncio.run(test_reschedule_appointment())

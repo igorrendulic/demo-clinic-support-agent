@@ -148,7 +148,7 @@ if is_api_mode:
 else:
     graph = workflow.compile()
 
-os.makedirs("assets", exist_ok=True)
-png_bytes = graph.get_graph().draw_mermaid_png()
-with open("assets/graph.png", "wb") as f:
-    f.write(png_bytes)
+# os.makedirs("assets", exist_ok=True)
+# png_bytes = graph.get_graph().draw_mermaid_png()
+# with open("assets/graph.png", "wb") as f:
+#     f.write(png_bytes)
