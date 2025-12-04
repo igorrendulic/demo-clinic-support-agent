@@ -72,7 +72,13 @@ def check_appointment(user: Annotated[User, InjectedState("user")],appointment: 
     if not appointment.date:
         missing.append("date")
     if not appointment.provider:
-        missing.append("provider")
+        # collect doctor names
+        all_user_doctors = appointment_service.list_all_doctors_for_user(user.id)
+        all_open_doctors = appointment_service.list_open_doctors()
+        return {
+            "ok": False,
+            "error": f"Please provide the doctor's name. These are the doctors you've seen before: {', '.join(all_user_doctors)}. If you'd like to see a different doctor, please choose one from the following list: {', '.join(all_open_doctors)}"
+        }
 
     if missing:
         return {
@@ -81,7 +87,9 @@ def check_appointment(user: Annotated[User, InjectedState("user")],appointment: 
         }
 
     # 2) Validate / normalize doctor
-    all_doctors = appointment_service.list_all_doctors_for_user(user.id)
+    all_user_doctors = appointment_service.list_all_doctors_for_user(user.id)
+    all_open_doctors = appointment_service.list_open_doctors()
+    all_doctors = all_user_doctors + all_open_doctors
     if not all_doctors:
         return {"ok": False, "error": "No doctors found for the user"}
 

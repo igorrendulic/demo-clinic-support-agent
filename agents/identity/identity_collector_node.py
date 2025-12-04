@@ -1,13 +1,16 @@
+from re import I
 from agents.llms import get_llm_mini_model
 from agents.models.state import ConversationState
 from agents.models.user import User
-from langgraph.graph import END
 from typing import Optional
 from pydantic import BaseModel, Field
-from services.user_service import user_service
 from logging_config import llm_logger, logger
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from agents.identity.prompts.identity_assistant import identity_collector_prompt
+from langgraph.types import interrupt
+from agents.identity.prompts.intent_prompt import IntentResult, intent_prompt
+from typing import Literal
+import asyncio
 
 llm = get_llm_mini_model(temperature=0.0)
 
@@ -22,6 +25,12 @@ class UpdateInfo(BaseModel):
     phone_number: Optional[str] = Field(default=None, description="The user's phone number")
     urgency_level: int = Field(default=1, description="The urgency level of the user's request")
     urgency_reason: str = Field(default="No urgency", description="The reason for the urgency")
+
+class UpdateInfoWithResponse(UpdateInfo):
+    """
+    Pydantic model for updating the user's information and response to the user.
+    """
+    response: str = Field(default=None, description="The response to the user based on the collected information")
 
 def init_state(state: ConversationState) -> ConversationState:
     """
@@ -117,66 +126,92 @@ def merge_users(existing_user: User | None, new_user: UpdateInfo) -> User:
         }
     )
 
-def handle_tool_calls(response, user: User) -> User | None:
+def validate_identity_completness(state: ConversationState) -> Literal["success", "retry", "urgency"]:
     """
-    Handles the tool calls from the response.
+    Validates the identity completeness (we require all the data to be present)
+    We also don't allow endless loops of asking user for information (max 10 corrections)
     """
-    if response and response.tool_calls:
-        for tool_call in response.tool_calls:
-            if tool_call["name"] == "UpdateInfo":
-                
+    user = state.get("user")
 
-                raw_args = tool_call["args"]
-                actual_data = raw_args.get("BaseModel", raw_args)
-                try:
-                    update_info_obj = UpdateInfo.model_validate(actual_data)
-                    updated_user = merge_users(user, update_info_obj)
-                    return updated_user
-                except Exception as e:
-                    logger.error(f"Error validating tool call: {e}")
-            else:
-                logger.error(f"Unknown tool call: {tool_call}. Ignoring...")
-    return None
+    if state.get("urgency_level", 0) >= 8:
+        return "urgency"
 
+    if not user:
+        return "retry"
+    
+    if not user.name or not user.date_of_birth or not (user.phone or user.ssn_last_4):
+        return "retry"
+    
+    return "success"
 
-def identity_collector_node(state: ConversationState) -> dict:
+async def ask_user_to_complete_information(state: ConversationState):
+    """
+    Ask user to complete their information.
+    """
+    user = state.get("user")
+    missing_info = missing_required_fields(user)
+
+    missing_info_str = f"Please provide the following information: \n- {'\n- '.join(missing_info)}"
+    user_input = interrupt(missing_info_str)
+
+    return {
+        "messages": [HumanMessage(content=user_input)],
+        "user": user,
+    }
+
+async def identity_collector_node(state: ConversationState) -> dict:
     """
     Graph node: call the identity_collector_runnable_node (LLM)
     which returns a User, then merge into state["User"].
     """
-    messages = state.get("messages", [])
-    logger.info(f"current messages: {messages}")
-    
-    # Create the chain: Prompt -> LLM (with tools bound)
-    chain = identity_collector_prompt | llm.bind_tools([UpdateInfo])
 
     if "user" not in state or state["user"] is None:
         state = init_state(state)
+    user: User = state.get("user")
 
-    # 3. Invoke the chain
+    # structured_llm = llm.with_structured_output(UpdateInfo)
+    # chain = identity_collector_prompt | structured_llm
+    structured_llm = llm.with_structured_output(UpdateInfoWithResponse)
+    chain = identity_collector_prompt | structured_llm
+
+    structured_intent_llm = llm.with_structured_output(IntentResult)
+    intent_chain = intent_prompt | structured_intent_llm  # a separate prompt just for intent
+    last_human_msg = next(
+        (m for m in reversed(state["messages"]) if m.type == "human"), None
+    )
+    intent_task = None
+    if last_human_msg:
+        intent_task = intent_chain.ainvoke({"text": last_human_msg.content})
+
+
+    # parallel invocation
     template_params = user_to_prompt_vars(state)
-    response = chain.invoke(template_params)
-    
-    llm_logger.info(f"{response}")
 
-    user = state.get("user")
-    if user is None:
-        user = init_state(state)
+    identity_task = chain.ainvoke(template_params)
+    identity_res, intent_res = await asyncio.gather(
+        identity_task,
+        intent_task,
+        return_exceptions=True,
+    )
 
-    updated_user = handle_tool_calls(response, user)
-    if updated_user is not None:
-        user = updated_user
+    llm_logger.info(f"identity_collector_node response: {identity_res}")
+    llm_logger.info(f"identity_collector_node intent response: {intent_res}")
 
-    # additional check if response from the LLM is empty (sometimes is, sometimes it asks user for additional info), but we don't have all data yet 
-    # (possible due to smaller LLM, i should test larger one)
-    additional_messages = []
-    if response.content is None or response.content == "":
-        missing_info = missing_required_fields(user)
-        if len(missing_info) > 0:
-            missing_info_str = ", ".join(missing_info)
-            additional_messages.append(AIMessage(content=f"Please provide the following information: {missing_info_str}"))
+    messages = []
+    if isinstance(identity_res, UpdateInfoWithResponse):
+        messages.append(AIMessage(content=identity_res.response))
 
-    return {
-        "messages": [response] + additional_messages,
+    user = merge_users(user, identity_res)
+
+    out = {
+        "messages": messages,
         "user": user,
+        "urgency_level": identity_res.urgency_level,
+        "urgency_reason": identity_res.urgency_reason,
     }
+
+    # optimistic injection — only add if successful
+    if intent_res is not None and isinstance(intent_res, IntentResult):
+        out["intents"] = [intent_res]
+
+    return out

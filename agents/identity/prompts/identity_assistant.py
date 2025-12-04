@@ -50,6 +50,20 @@ identity_collector_prompt = ChatPromptTemplate.from_messages([
     ("placeholder", "{messages}"),
 ])
 
+identity_completness_validator_prompt = ChatPromptTemplate.from_messages([
+    ("system", """You are a helpful and polite medical triage assistant for ACME Health clinic. 
+        Your goal is to validate the identity completeness. You need to check if the user has provided all the required information:
+        1. Full Name
+        2. Date of Birth (DOB)
+        3. Last 4 digits of SSN or a phone number (one of them)
+
+        If the user has provided all the required information, return "success".
+        If the user has not provided all the required information, return "retry".
+        If the user has provided too many corrections, return "failure".
+    """),
+    ("placeholder", "{messages}"),
+])
+
 identity_fullfillment_helper_prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a helpful and polite medical triage assistant for ACME Health clinic. 
 

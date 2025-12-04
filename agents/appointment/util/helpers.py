@@ -72,14 +72,25 @@ def pop_appointment_stack_state(state: ConversationState) -> dict:
 def appointment_template_params(state: ConversationState):
     user = state.get("user")
     messages = state.get("messages", [])
+    intent_message = None
     if len(messages) == 0:
+        intents = state.get("intents", [])
+        if len(intents) > 0:
+            # find strongest intent that the user might expressed and set that as first human message
+            strongest_intent = max(intents, key=lambda x: x.confidence and x.intent != "other")
+            if strongest_intent:
+                intent_message = HumanMessage(content=strongest_intent.original_message)
         # check if llm is google, then add human message (like hello or insert previous intent)
         # otherwise add systemmessage
-        llm_model_name = llm_model.model_name
-        if llm_model_name.startswith("gemini"):
-            messages = [HumanMessage(content="Hi")]
+        if intent_message is not None:
+            messages = [intent_message]
         else:
-            messages = [SystemMessage(content="Respond either with a tool call or a message to the user or both if needed.")]
+            # placeholder since conversation history has been wiped out (transfer from identity to appointment)
+            llm_model_name = llm_model.model_name
+            if llm_model_name.startswith("gemini"):
+                messages = [HumanMessage(content="Hi")]
+            else:
+                messages = [SystemMessage(content="Respond either with a tool call or a message to the user or both if needed.")]
     
     name = getattr(user, "name", None) if user is not None else None
 
