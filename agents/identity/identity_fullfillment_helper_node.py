@@ -1,7 +1,7 @@
 from agents.models.state import ConversationState
 from agents.llms import get_llm_mini_model
 from agents.identity.prompts.identity_assistant import identity_fullfillment_helper_prompt
-from agents.identity.identity_collector_node import UpdateInfo, user_to_prompt_vars, handle_tool_calls
+from agents.identity.identity_collector_node import UpdateInfo, user_to_prompt_vars, merge_users
 from logging_config import llm_logger
 from typing import Literal
 from langchain_core.messages import HumanMessage
@@ -58,27 +58,26 @@ def identity_fullfillment_helper_node(state: ConversationState) -> dict:
     user = state.get("user")
 
     number_of_corrections = state.get("identity_fullfillment_number_of_corrections", 0)
-    chain = identity_fullfillment_helper_prompt | llm.bind_tools([UpdateInfo])
+    llm_with_structured_output = llm.with_structured_output(UpdateInfo)
+    chain = identity_fullfillment_helper_prompt | llm_with_structured_output
 
     template_params = user_to_prompt_vars(state)
     response = chain.invoke(template_params)
     llm_logger.info(f"identity_fullfillment_helper_node response: {response}")
 
-    updated_user = handle_tool_calls(response, user)
-    if updated_user is not None:
-        number_of_corrections = number_of_corrections + 1
-        user = updated_user
+    updated_user = merge_users(user, response)
+    number_of_corrections = number_of_corrections + 1
         
-    u = user_service.get_user(user.name, user.date_of_birth, user.phone, user.ssn_last_4)
-    if u is not None:
-        # user has been verified, validation node should validate it also
-        return {
-            "user": u,
-            "identity_fullfillment_number_of_corrections": number_of_corrections,
-        }
+    # u = user_service.get_user(updated_user.name, updated_user.date_of_birth, updated_user.phone, updated_user.ssn_last_4)
+    # if u is not None:
+    #     # user has been verified, validation node should validate it also
+    #     return {
+    #         "user": updated_user,
+    #         "identity_fullfillment_number_of_corrections": number_of_corrections,
+    #     }
   
     return {
-        "messages": [response],
-        "user": user,
+        # "messages": [response],
+        "user": updated_user,
         "identity_fullfillment_number_of_corrections": number_of_corrections,
     }

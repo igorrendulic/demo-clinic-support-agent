@@ -21,7 +21,6 @@ primary_appointment_prompt = ChatPromptTemplate.from_messages([
             Name: {name}
             \nCurrent time: {time}.""",
         ),
-        ("ai", "Hello, how can I help you today?"),
         ("placeholder", "{messages}"),
     ]
 ).partial(time=datetime.now)

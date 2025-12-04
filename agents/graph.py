@@ -22,17 +22,6 @@ from agents.appointment.appointment_router import route_reschedule_appointment
 import os
 from agents.route_start import route_start
 
-# def initialize_state(state: ConversationState) -> ConversationState:
-#    return {
-#         # keep existing values if present, otherwise defaults
-#         "user": state.get("user", User()),
-#         "messages": state.get("messages", []),
-#         "intents": state.get("intents", []),
-#         "active_intent": state.get("active_intent"),  # can be None
-#         "user_verified": state.get("user_verified", False),
-#         "identity_fullfillment_number_of_corrections": state.get("identity_fullfillment_number_of_corrections", 0),
-#     }
-
 workflow = StateGraph(ConversationState)
 
 # "worker" nodes

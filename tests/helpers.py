@@ -38,13 +38,8 @@ async def run_graph_turn(message: str, thread_id: str | None = None) -> Tuple[st
 
     # 1) Get current state for this thread
     snapshot = await graph.aget_state(config)
-    print("🧪 next:", snapshot.next)
-    if snapshot.tasks:
-        print("🧪 task node:", snapshot.tasks[0].node)
-        print("🧪 interrupts:", snapshot.tasks[0].interrupts)
-
     # 2) Decide whether to resume an interrupt, or run normally
-    if snapshot.tasks and snapshot.tasks[0].interrupts:
+    if snapshot.interrupts and len(snapshot.interrupts) > 0:
         # we're resuming an interrupted task
         result = await graph.ainvoke(
             Command(resume=message),
@@ -60,8 +55,8 @@ async def run_graph_turn(message: str, thread_id: str | None = None) -> Tuple[st
 
     # 3) Check if we hit a new interrupt
     snapshot = await graph.aget_state(config)
-    if snapshot.tasks and snapshot.tasks[0].interrupts:
-        interrupt_value = snapshot.tasks[0].interrupts[0].value
+    if snapshot.interrupts and len(snapshot.interrupts) > 0:
+        interrupt_value = snapshot.interrupts[0].value
         return interrupt_value, tid
 
     # 4) Otherwise, return the latest assistant message
