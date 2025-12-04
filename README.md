@@ -2,7 +2,7 @@
 
 A conversational AI assistant built with LangGraph for managing medical appointments. Handles patient identity verification, appointment booking, cancellation, and rescheduling through natural language conversations.
 
-![Graph](assets/graph.png)
+![Graph](assets/agent_flow.png)
 
 ## What It Can Handle
 
@@ -10,7 +10,7 @@ A conversational AI assistant built with LangGraph for managing medical appointm
 - Collects patient information (name, DOB, phone/SSN)
 - Verifies existing patients against database
 - Handles new patient registration
-- Corrects incorrect information with retry attempts
+- Corrects incorrect information with retry attempts (preventing guessing)
 - Detects urgent requests and escalates appropriately
 
 ### Appointment Management
