@@ -12,6 +12,7 @@ A conversational AI assistant built with LangGraph for managing medical appointm
 - Handles new patient registration
 - Corrects incorrect information with retry attempts (preventing guessing)
 - Detects urgent requests and escalates appropriately
+- Captures user intent during identity collection to avoid re-stating when transitioning to appointment management (context is wiped between agents to reduce hallucinations)
 
 ### Appointment Management
 - **Book appointments**: Validates dates, times, and providers; checks for conflicts
