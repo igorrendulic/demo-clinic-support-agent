@@ -19,6 +19,7 @@ A conversational AI assistant built with LangGraph for managing medical appointm
 - **Cancel appointments**: Lists appointments, handles ambiguity, cancels by ID
 - **Reschedule appointments**: Lists appointments, validates new times, detects collisions
 - **List appointments**: Shows all upcoming appointments sorted by date/time
+- **Long-term memory**: Remembers new doctor preferences when users don't go with their usual doctor, so the new preference is used for future appointments
 
 ### Error Handling
 - Appointment conflicts with automatic alternative suggestions
