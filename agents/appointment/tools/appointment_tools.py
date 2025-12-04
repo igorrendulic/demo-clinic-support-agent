@@ -8,6 +8,10 @@ from datetime import datetime
 from logging_config import logger
 from services.appointment_service import appointment_service
 from pydantic import BaseModel, Field
+from langgraph.store.memory import InMemoryStore
+
+doctor_preference_store = InMemoryStore()
+namespace = ("doctor_preferences", "user_id")
 
 def normalize(s: str) -> str:
     s = s.lower() # lowercase
@@ -72,13 +76,18 @@ def check_appointment(user: Annotated[User, InjectedState("user")],appointment: 
     if not appointment.date:
         missing.append("date")
     if not appointment.provider:
-        # collect doctor names
-        all_user_doctors = appointment_service.list_all_doctors_for_user(user.id)
-        all_open_doctors = appointment_service.list_open_doctors()
-        return {
-            "ok": False,
-            "error": f"Please provide the doctor's name. These are the doctors you've seen before: {', '.join(all_user_doctors)}. If you'd like to see a different doctor, please choose one from the following list: {', '.join(all_open_doctors)}"
-        }
+        # check if this is a preference or the usual doctor
+        preference = doctor_preference_store.get(namespace, user.id)
+        if preference:
+            appointment.provider = preference.value.get("doctor_name", "")
+        else:
+            # collect doctor names
+            all_user_doctors = appointment_service.list_all_doctors_for_user(user.id)
+            all_open_doctors = appointment_service.list_open_doctors()
+            return {
+                "ok": False,
+                "error": f"Please provide the doctor's name. These are the doctors you've seen before: {', '.join(all_user_doctors)}. If you'd like to see a different doctor, please choose one from the following list: {', '.join(all_open_doctors)}"
+            }
 
     if missing:
         return {
@@ -128,6 +137,20 @@ def check_appointment(user: Annotated[User, InjectedState("user")],appointment: 
     # exactly one match
     appointment.provider = matches[0]
 
+    # check if this is a preference or the usual doctor
+    is_new_preference = True
+    for d in all_user_doctors:
+        if d == appointment.provider:
+            is_new_preference = False
+            break
+    
+    # if the doctor is one that user hasn't seen before add it as new preference 
+    # next time, the preferred doctor will be seen instead of the usual one
+    if is_new_preference:
+        doctor_preference_store.put(namespace, user.id, {
+            "doctor_name": appointment.provider,
+            "reason": "",
+        })
     # 3) Parse date
     try:
         appointment.date = datetime.strptime(

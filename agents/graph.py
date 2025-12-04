@@ -18,6 +18,7 @@ from agents.appointment.appointment_router import AppointmentRoute, route_primar
 from agents.appointment.primary_appointment_node import primary_appointment_node_tools
 from agents.appointment.reschedule_appointment_node import reschedule_appointment_node, reschedule_appointment_node_tools
 from agents.appointment.appointment_router import route_reschedule_appointment
+from langgraph.store.memory import InMemoryStore
 
 import os
 from agents.route_start import route_start
@@ -160,7 +161,7 @@ if is_api_mode:
     graph = workflow.compile(checkpointer=memory)
 else:
     graph = workflow.compile()
-
+    
 # os.makedirs("assets", exist_ok=True)
 # png_bytes = graph.get_graph().draw_mermaid_png()
 # with open("assets/graph.png", "wb") as f:
