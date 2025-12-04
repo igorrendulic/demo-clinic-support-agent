@@ -28,6 +28,7 @@ class MultipleAppointmentsFoundError(Exception):
 class AppointmentService:
     def __init__(self):
         self.appointments: list[Appointment] = []
+        self.open_doctors: list[str] = []
         today = date.today()
         tomorrow = today + timedelta(days=1)
         next_week = today + timedelta(days=7)
@@ -40,6 +41,10 @@ class AppointmentService:
             Appointment(id="5", user_id="2", date=tomorrow.strftime("%Y-%m-%d"), time="13:00", location="101 Main St, Anytown, USA", provider="Dr. Jill Johnson", reason="Follow-up", status="Confirmed"),
             Appointment(id="6", user_id="3", date=next_week.strftime("%Y-%m-%d"), time="14:00", location="123 Main St, Anytown, USA", provider="Dr. Jack Daniels", reason="Annual physical", status="Confirmed"),
             Appointment(id="7", user_id="3", date=in_two_weeks.strftime("%Y-%m-%d"), time="15:00", location="456 Main St, Anytown, USA", provider="Dr. Jim Beam", reason="Follow-up", status="Confirmed"),
+        ]
+        self.open_doctors = [
+            "Dr. Usually Free",
+            "Dr. Negroni Sours",
         ]
 
     def get_appointments(self, user_id: str) -> list[Appointment]:
@@ -91,6 +96,14 @@ class AppointmentService:
         all_doctors = list(set([a.provider for a in self.appointments]))
         unique = set(all_doctors)
         return list(unique)
+
+    def list_open_doctors(self) -> list[str]:
+        """
+        List all open doctors.
+        Returns:
+        - A list of all open doctors
+        """
+        return self.open_doctors
 
     def list_all_doctors_for_user(self, user_id: str) -> list[str]:
         """

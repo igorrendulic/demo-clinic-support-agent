@@ -46,21 +46,21 @@ workflow.add_edge(IdentityRoute.NEW_PATIENT_CONFIRMATION_REQUEST_NODE, IdentityR
 workflow.add_edge(IdentityRoute.IDENTITY_ASK_USER_TO_CORRECT_INFORMATION, IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE)
 workflow.add_edge(IdentityRoute.CLEANUP_MESSAGES_MIDDLEWARE_NODE, IdentityRoute.PRIMARY_APPOINTMENT_NODE)
 
-# Loop back into collector after the user responds
-workflow.add_edge(
-    IdentityRoute.IDENTITY_ASK_USER_TO_COMPLETE_INFORMATION,
-    IdentityRoute.IDENTITY_COLLECTOR_NODE,
-)
+# Loop back into collector after the user responds (this is for question/answer)
+# workflow.add_edge(
+#     IdentityRoute.IDENTITY_ASK_USER_TO_COMPLETE_INFORMATION,
+#     IdentityRoute.IDENTITY_COLLECTOR_NODE,
+# )
 
 # asking user to complete the information (required name, DOB and SSN or phone number)
-workflow.add_conditional_edges(IdentityRoute.IDENTITY_COLLECTOR_NODE, 
-    validate_identity_completness,
-    {
-        "success": IdentityRoute.IDENTITY_VERIFICATION_NODE,
-        "retry": IdentityRoute.IDENTITY_ASK_USER_TO_COMPLETE_INFORMATION,
-        "urgency": IdentityRoute.REDIRECT_TO_URGENCY_HANDOFF,
-    }
-)
+# workflow.add_conditional_edges(IdentityRoute.IDENTITY_COLLECTOR_NODE, 
+#     validate_identity_completness,
+#     {
+#         "success": IdentityRoute.IDENTITY_VERIFICATION_NODE,
+#         "retry": IdentityRoute.IDENTITY_ASK_USER_TO_COMPLETE_INFORMATION,
+#         "urgency": IdentityRoute.REDIRECT_TO_URGENCY_HANDOFF,
+#     }
+# )
 
 # asking user to fix existing information (limited try amounts)
 workflow.add_conditional_edges(IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE, 

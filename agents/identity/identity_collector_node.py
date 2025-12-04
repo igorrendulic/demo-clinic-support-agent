@@ -5,7 +5,7 @@ from agents.models.user import User
 from typing import Optional
 from pydantic import BaseModel, Field
 from logging_config import llm_logger, logger
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from agents.identity.prompts.identity_assistant import identity_collector_prompt
 from langgraph.types import interrupt
 from agents.identity.prompts.intent_prompt import IntentResult, intent_prompt
@@ -26,6 +26,11 @@ class UpdateInfo(BaseModel):
     urgency_level: int = Field(default=1, description="The urgency level of the user's request")
     urgency_reason: str = Field(default="No urgency", description="The reason for the urgency")
 
+class UpdateInfoWithResponse(UpdateInfo):
+    """
+    Pydantic model for updating the user's information and response to the user.
+    """
+    response: str = Field(default=None, description="The response to the user based on the collected information")
 
 def init_state(state: ConversationState) -> ConversationState:
     """
@@ -164,7 +169,9 @@ async def identity_collector_node(state: ConversationState) -> dict:
         state = init_state(state)
     user: User = state.get("user")
 
-    structured_llm = llm.with_structured_output(UpdateInfo)
+    # structured_llm = llm.with_structured_output(UpdateInfo)
+    # chain = identity_collector_prompt | structured_llm
+    structured_llm = llm.with_structured_output(UpdateInfoWithResponse)
     chain = identity_collector_prompt | structured_llm
 
     structured_intent_llm = llm.with_structured_output(IntentResult)
@@ -190,9 +197,14 @@ async def identity_collector_node(state: ConversationState) -> dict:
     llm_logger.info(f"identity_collector_node response: {identity_res}")
     llm_logger.info(f"identity_collector_node intent response: {intent_res}")
 
+    messages = []
+    if isinstance(identity_res, UpdateInfoWithResponse):
+        messages.append(AIMessage(content=identity_res.response))
+
     user = merge_users(user, identity_res)
 
     out = {
+        "messages": messages,
         "user": user,
         "urgency_level": identity_res.urgency_level,
         "urgency_reason": identity_res.urgency_reason,

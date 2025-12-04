@@ -33,11 +33,7 @@ def custom_formatter(record):
         else:
             msg = str(msg)
 
-        # --- NEW LOGIC END ---
-
-        # Override the message in the record so {message} uses the pretty version
         record["message"] = msg
-
         return (
             "<green>{time:HH:mm:ss}</green> | "
             "<level>{level: <8}</level> | "
