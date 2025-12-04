@@ -11,19 +11,20 @@ class IdentityRoute(StrEnum):
     """
     Pydantic model for the identity routing path.
     """
-    # "working" nodes
+    
     IDENTITY_COLLECTOR_NODE = "identity_collector_node"
     IDENTITY_ROUTING_NODE = "identity_routing_node"
     IDENTITY_VERIFICATION_NODE = "identity_verification_node"
 
-    # next step nodes
     PRIMARY_APPOINTMENT_NODE = "primary_appointment_node"
     REDIRECT_TO_NEW_PATIENT_HANDOFF = "redirect_to_new_patient_handoff"
+    REDIRECT_TO_URGENCY_HANDOFF = "redirect_to_urgency_handoff"
     NEW_PATIENT_CONFIRMATION_REQUEST_NODE = "new_patient_confirmation_request_node"
     IDENTITY_FULLFILLMENT_HELPER_NODE = "identity_fullfillment_helper_node"
     VALIDATE_CORRECTED_INPUT = "validate_corrected_input"
     IDENTITY_ASK_USER_TO_CORRECT_INFORMATION = "identity_ask_user_to_correct_information"
     CLEANUP_MESSAGES_MIDDLEWARE_NODE = "cleanup_messages_middleware_node"
+    IDENTITY_ASK_USER_TO_COMPLETE_INFORMATION = "identity_ask_user_to_complete_information"
 
 IdentityRoutingPath = Literal[
     IdentityRoute.IDENTITY_COLLECTOR_NODE,
@@ -31,11 +32,13 @@ IdentityRoutingPath = Literal[
     IdentityRoute.IDENTITY_VERIFICATION_NODE,
     IdentityRoute.PRIMARY_APPOINTMENT_NODE,
     IdentityRoute.REDIRECT_TO_NEW_PATIENT_HANDOFF,
+    IdentityRoute.REDIRECT_TO_URGENCY_HANDOFF,
     IdentityRoute.NEW_PATIENT_CONFIRMATION_REQUEST_NODE,
     IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE,
     IdentityRoute.VALIDATE_CORRECTED_INPUT,
     IdentityRoute.IDENTITY_ASK_USER_TO_CORRECT_INFORMATION,
     IdentityRoute.CLEANUP_MESSAGES_MIDDLEWARE_NODE,
+    IdentityRoute.IDENTITY_ASK_USER_TO_COMPLETE_INFORMATION,
 ]
 
 def identity_routing_node(state: ConversationState) -> Command[IdentityRoutingPath]:

@@ -4,9 +4,10 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver
 from agents.identity.identity_collector_node import identity_collector_node
 from agents.identity.identity_verification_node import identity_verification_node, new_patient_confirmation_request_node
-from agents.identity.new_patient_handoff import new_patient_handoff_node
+from agents.identity.handoffs import new_patient_handoff_node, urgency_handoff_node
 from agents.appointment.primary_appointment_node import primary_appointment_node
 from agents.appointment.clear_history_node import cleanup_messages_middleware_node
+from agents.identity.identity_collector_node import ask_user_to_complete_information, validate_identity_completness
 from agents.identity.identity_fullfillment_helper_node import identity_fullfillment_helper_node, validate_corrected_input, ask_user_to_correct_information
 from agents.models.user import User
 from agents.identity.identity_router import IdentityRoute, identity_routing_node
@@ -21,15 +22,16 @@ from agents.appointment.appointment_router import route_reschedule_appointment
 import os
 from agents.route_start import route_start
 
-def initialize_state(state: ConversationState) -> ConversationState:
-   return {
-        # keep existing values if present, otherwise defaults
-        "user": state.get("user", User()),
-        "messages": state.get("messages", []),
-        "intents": state.get("intents", []),
-        "active_intent": state.get("active_intent"),  # can be None
-        "user_verified": state.get("user_verified", False),
-    }
+# def initialize_state(state: ConversationState) -> ConversationState:
+#    return {
+#         # keep existing values if present, otherwise defaults
+#         "user": state.get("user", User()),
+#         "messages": state.get("messages", []),
+#         "intents": state.get("intents", []),
+#         "active_intent": state.get("active_intent"),  # can be None
+#         "user_verified": state.get("user_verified", False),
+#         "identity_fullfillment_number_of_corrections": state.get("identity_fullfillment_number_of_corrections", 0),
+#     }
 
 workflow = StateGraph(ConversationState)
 
@@ -41,11 +43,13 @@ workflow.add_node(IdentityRoute.IDENTITY_VERIFICATION_NODE, identity_verificatio
 # next steps for identity
 workflow.add_node(IdentityRoute.NEW_PATIENT_CONFIRMATION_REQUEST_NODE, new_patient_confirmation_request_node)
 workflow.add_node(IdentityRoute.REDIRECT_TO_NEW_PATIENT_HANDOFF, new_patient_handoff_node)
-workflow.add_node(IdentityRoute.PRIMARY_APPOINTMENT_NODE, primary_appointment_node) # main appointment node
+workflow.add_node(IdentityRoute.REDIRECT_TO_URGENCY_HANDOFF, urgency_handoff_node)
 workflow.add_node(IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE, identity_fullfillment_helper_node)
 workflow.add_node(IdentityRoute.VALIDATE_CORRECTED_INPUT, validate_corrected_input)
 workflow.add_node(IdentityRoute.IDENTITY_ASK_USER_TO_CORRECT_INFORMATION, ask_user_to_correct_information)
+workflow.add_node(IdentityRoute.IDENTITY_ASK_USER_TO_COMPLETE_INFORMATION, ask_user_to_complete_information)
 workflow.add_node(IdentityRoute.CLEANUP_MESSAGES_MIDDLEWARE_NODE, cleanup_messages_middleware_node)
+
 # always to go to verification after collecting the data (collector -> verification -> router)
 workflow.add_edge(IdentityRoute.IDENTITY_COLLECTOR_NODE, IdentityRoute.IDENTITY_VERIFICATION_NODE)
 workflow.add_edge(IdentityRoute.IDENTITY_VERIFICATION_NODE, IdentityRoute.IDENTITY_ROUTING_NODE)
@@ -53,6 +57,23 @@ workflow.add_edge(IdentityRoute.NEW_PATIENT_CONFIRMATION_REQUEST_NODE, IdentityR
 workflow.add_edge(IdentityRoute.IDENTITY_ASK_USER_TO_CORRECT_INFORMATION, IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE)
 workflow.add_edge(IdentityRoute.CLEANUP_MESSAGES_MIDDLEWARE_NODE, IdentityRoute.PRIMARY_APPOINTMENT_NODE)
 
+# Loop back into collector after the user responds
+workflow.add_edge(
+    IdentityRoute.IDENTITY_ASK_USER_TO_COMPLETE_INFORMATION,
+    IdentityRoute.IDENTITY_COLLECTOR_NODE,
+)
+
+# asking user to complete the information (required name, DOB and SSN or phone number)
+workflow.add_conditional_edges(IdentityRoute.IDENTITY_COLLECTOR_NODE, 
+    validate_identity_completness,
+    {
+        "success": IdentityRoute.IDENTITY_VERIFICATION_NODE,
+        "retry": IdentityRoute.IDENTITY_ASK_USER_TO_COMPLETE_INFORMATION,
+        "urgency": IdentityRoute.REDIRECT_TO_URGENCY_HANDOFF,
+    }
+)
+
+# asking user to fix existing information (limited try amounts)
 workflow.add_conditional_edges(IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE, 
     validate_corrected_input,
     {
@@ -62,7 +83,7 @@ workflow.add_conditional_edges(IdentityRoute.IDENTITY_FULLFILLMENT_HELPER_NODE,
     }
 )
 
-# Start Router
+# Entry/Start Router
 workflow.add_conditional_edges(START, 
     route_start,
     {
@@ -73,6 +94,9 @@ workflow.add_conditional_edges(START,
         "reschedule_appointment": "reschedule_appointment",
     }
 )
+
+# adding primary appointment node
+workflow.add_node(IdentityRoute.PRIMARY_APPOINTMENT_NODE, primary_appointment_node) # main appointment node
 
 # Appontment part of the graph
 # Book appointments assistant

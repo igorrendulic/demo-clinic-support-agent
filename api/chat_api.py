@@ -4,6 +4,7 @@ from agents.graph import graph
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 import uuid
+from langchain_core.messages import AIMessage
 
 chat_router = APIRouter()
 
@@ -16,7 +17,7 @@ async def chat(request: ChatRequest):
     snapshot = await graph.aget_state(config)
     
     # Check if there are active interrupts pending
-    if snapshot.tasks and snapshot.tasks[0].interrupts:
+    if snapshot.interrupts:
         result = await graph.ainvoke(
             Command(resume=request.message), 
             config=config
@@ -28,17 +29,24 @@ async def chat(request: ChatRequest):
             config=config,
         )
 
-    snapshot = graph.get_state(config)
-    if snapshot.tasks and snapshot.tasks[0].interrupts:
+    snapshot = await graph.aget_state(config)
+    if snapshot.interrupts:
         # OUTCOME X: INTERRUPT HIT
         # The graph ran for a bit, then hit a NEW interrupt() line.
         # We extract the value (the question) and return it.
-        interrupt_value = snapshot.tasks[0].interrupts[0].value
+        interrupt_value = snapshot.interrupts[0].value
         return ChatResponse(message=interrupt_value, thread_id=tid)
     else:
-        latest_msg = result["messages"][-1].content
-        if isinstance(latest_msg, list):
-            last_text = latest_msg[-1].get("text", "")
+        # Prefer last AI message, not just "last message"
+        messages = result["messages"]
+        ai_messages = [m for m in messages if isinstance(m, AIMessage)]
+        last_msg = ai_messages[-1] if ai_messages else messages[-1]
+
+        content = last_msg.content
+        if isinstance(content, list):
+            text_chunks = [c.get("text", "") for c in content if isinstance(c, dict)]
+            last_text = text_chunks[-1] if text_chunks else ""
         else:
-            last_text = latest_msg
+            last_text = content
+
         return ChatResponse(message=last_text, thread_id=tid)

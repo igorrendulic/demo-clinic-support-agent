@@ -1,13 +1,13 @@
 from agents.llms import get_llm_mini_model
 from agents.models.state import ConversationState
 from agents.models.user import User
-from langgraph.graph import END
 from typing import Optional
 from pydantic import BaseModel, Field
-from services.user_service import user_service
 from logging_config import llm_logger, logger
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from agents.identity.prompts.identity_assistant import identity_collector_prompt
+from langgraph.types import interrupt
+from typing import Literal
 
 llm = get_llm_mini_model(temperature=0.0)
 
@@ -22,6 +22,15 @@ class UpdateInfo(BaseModel):
     phone_number: Optional[str] = Field(default=None, description="The user's phone number")
     urgency_level: int = Field(default=1, description="The urgency level of the user's request")
     urgency_reason: str = Field(default="No urgency", description="The reason for the urgency")
+
+class UpdateInfoAndResponseMessage(UpdateInfo):
+     assistant_message: str = Field(
+        description=(
+            "The natural language message to send to the user next. "
+            "If some information is missing, politely ask ONLY for the missing fields. "
+            "If everything is present, confirm and explain the next step."
+        )
+    )
 
 def init_state(state: ConversationState) -> ConversationState:
     """
@@ -124,7 +133,6 @@ def handle_tool_calls(response, user: User) -> User | None:
     if response and response.tool_calls:
         for tool_call in response.tool_calls:
             if tool_call["name"] == "UpdateInfo":
-                
 
                 raw_args = tool_call["args"]
                 actual_data = raw_args.get("BaseModel", raw_args)
@@ -138,45 +146,70 @@ def handle_tool_calls(response, user: User) -> User | None:
                 logger.error(f"Unknown tool call: {tool_call}. Ignoring...")
     return None
 
+def validate_identity_completness(state: ConversationState) -> Literal["success", "retry", "urgency"]:
+    """
+    Validates the identity completeness (we require all the data to be present)
+    We also don't allow endless loops of asking user for information (max 10 corrections)
+    """
+    user = state.get("user")
 
-def identity_collector_node(state: ConversationState) -> dict:
+    if state.get("urgency_level", 0) >= 8:
+        return "urgency"
+
+    if not user:
+        return "retry"
+    
+    if not user.name or not user.date_of_birth or not (user.phone or user.ssn_last_4):
+        return "retry"
+    
+    return "success"
+
+async def ask_user_to_complete_information(state: ConversationState):
+    """
+    Ask user to complete their information.
+    """
+    user = state.get("user")
+    missing_info = missing_required_fields(user)
+
+    missing_info_str = f"Please provide the following information: \n- {'\n- '.join(missing_info)}"
+    user_input = interrupt(missing_info_str)
+
+    return {
+        "messages": [HumanMessage(content=user_input)],
+        "user": user,
+    }
+
+async def identity_collector_node(state: ConversationState) -> dict:
     """
     Graph node: call the identity_collector_runnable_node (LLM)
     which returns a User, then merge into state["User"].
     """
     messages = state.get("messages", [])
-    logger.info(f"current messages: {messages}")
-    
-    # Create the chain: Prompt -> LLM (with tools bound)
-    chain = identity_collector_prompt | llm.bind_tools([UpdateInfo])
 
     if "user" not in state or state["user"] is None:
         state = init_state(state)
-
-    # 3. Invoke the chain
-    template_params = user_to_prompt_vars(state)
-    response = chain.invoke(template_params)
-    
-    llm_logger.info(f"{response}")
+    user: User = state.get("user")
 
     user = state.get("user")
     if user is None:
         user = init_state(state)
 
-    updated_user = handle_tool_calls(response, user)
-    if updated_user is not None:
-        user = updated_user
+    structured_llm = llm.with_structured_output(UpdateInfoAndResponseMessage)
+    chain = identity_collector_prompt | structured_llm
 
-    # additional check if response from the LLM is empty (sometimes is, sometimes it asks user for additional info), but we don't have all data yet 
-    # (possible due to smaller LLM, i should test larger one)
-    additional_messages = []
-    if response.content is None or response.content == "":
-        missing_info = missing_required_fields(user)
-        if len(missing_info) > 0:
-            missing_info_str = ", ".join(missing_info)
-            additional_messages.append(AIMessage(content=f"Please provide the following information: {missing_info_str}"))
+    # 3. Invoke the chain
+    template_params = user_to_prompt_vars(state)
+    response = await chain.ainvoke(template_params)
+
+    llm_logger.info(f"identity_collector_node response: {response}")
+
+    user = merge_users(user, response)
+
+    new_messages = messages + [AIMessage(content=response.assistant_message)]
 
     return {
-        "messages": [response] + additional_messages,
+        "messages": new_messages,
         "user": user,
+        "urgency_level": response.urgency_level,
+        "urgency_reason": response.urgency_reason,
     }

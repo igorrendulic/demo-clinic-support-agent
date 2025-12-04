@@ -1,13 +1,10 @@
 from agents.models.state import ConversationState
 from agents.llms import get_llm_mini_model
 from agents.identity.prompts.identity_assistant import identity_fullfillment_helper_prompt
-from langchain_core.messages import AIMessage
 from agents.identity.identity_collector_node import UpdateInfo, user_to_prompt_vars, handle_tool_calls
 from logging_config import llm_logger
-from services.user_service import UserService
-from typing import Tuple, List, Literal
-from agents.models.user import User
-from langchain_core.messages import HumanMessage, BaseMessage
+from typing import Literal
+from langchain_core.messages import HumanMessage
 from langgraph.types import interrupt
 from services.user_service import user_service
 
