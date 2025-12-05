@@ -267,6 +267,8 @@ def find_appointment_tool(user: Annotated[User, InjectedState("user")], appointm
     if not appointment.date:
         return {"ok": False, "error": "Missing information. Appointment date is required."}
     
+    appointment.user_id = user.id
+    
     found_appointments = appointment_service.find_appointments_for_user(appointment)
     if len(found_appointments) == 0:
         return {"ok": False, "error": "Appointment not found on that date. Try again with a different date or ask me to list your appointments."}
@@ -289,6 +291,8 @@ def commit_cancel_appointment(user: Annotated[User, InjectedState("user")], appo
     """
     if not user or not user.id:
         return {"ok": False, "error": "User not found"}
+
+    appointment.user_id = user.id
     
     # sanity check if appointment still exists
     appointments = appointment_service.find_appointments_for_user(appointment)
