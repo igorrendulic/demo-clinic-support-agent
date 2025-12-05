@@ -161,8 +161,8 @@ class AppointmentService:
         - AppointmentNotFoundError: If the appointment is not found
         - MultipleAppointmentsFoundError: If multiple appointments are found for the same date
         """
-        if not appointment.user_id or not appointment.date:
-            raise AppointmentNotFoundError("User id or date not found")
+        if not appointment.date:
+            raise AppointmentNotFoundError("No appointment date provided")
         
         found_appointments = []
         for i, a in enumerate(self.appointments):
